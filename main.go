@@ -17,7 +17,15 @@ import (
 
 // State
 type State struct {
-	Count int
+	Count  int
+	Counts []int
+}
+
+func (s State) Copy() State {
+	return State{
+		Count:  s.Count,
+		Counts: append([]int{}, s.Counts...),
+	}
 }
 
 // Action
@@ -29,16 +37,28 @@ type Action interface {
 type IncrementAction struct{}
 
 func (a IncrementAction) Apply(s State) State {
-	s.Count++
-	return s
+	state := s.Copy()
+	state.Count++
+	return state
 }
 
 // DecrementAction
 type DecrementAction struct{}
 
 func (a DecrementAction) Apply(s State) State {
-	s.Count--
-	return s
+	state := s.Copy()
+	state.Count--
+	return state
+}
+
+type AppendAction struct {
+	Count int
+}
+
+func (a AppendAction) Apply(s State) State {
+	state := s.Copy()
+	state.Counts = append(state.Counts, a.Count)
+	return state
 }
 
 // Reducer
