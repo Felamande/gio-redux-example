@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 
@@ -73,28 +74,27 @@ func (s *Store) GetState() State {
 
 // ViewModel
 type ViewModel struct {
-	s          *Store
-	countLabel string
+	store *Store // Add store to ViewModel
 }
 
 func NewViewModel(store *Store) *ViewModel {
 	vm := &ViewModel{
-		s: store,
+		store: store, // Store the store
 	}
 
 	return vm
 }
 
-func (v *ViewModel) Increment() {
-	v.s.Dispatch(IncrementAction{})
+func (v *ViewModel) Incre() {
+	v.store.Dispatch(IncrementAction{})
 }
 
-func (v *ViewModel) Decrement() {
-	v.s.Dispatch(DecrementAction{})
+func (v *ViewModel) Decre() {
+	v.store.Dispatch(DecrementAction{})
 }
 
-func (vm *ViewModel) CountLabel() string {
-	return vm.countLabel
+func (v *ViewModel) CountLabel() string {
+	return fmt.Sprintf("%v", v.store.state.Count)
 }
 
 func main() {
@@ -113,8 +113,6 @@ func run(w *app.Window) error {
 	store := NewStore(reduce, State{Count: 0})
 	viewModel := NewViewModel(store) // Create ViewModel
 
-	// UI elements
-
 	var ops op.Ops
 	view := NewView(viewModel, th) // Pass ViewModel to View
 
@@ -125,8 +123,7 @@ func run(w *app.Window) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
-			view.Layout(gtx) // Pass theme to Layout
-
+			view.Layout(gtx, th) // Pass theme to Layout
 			e.Frame(gtx.Ops)
 		}
 	}
@@ -134,7 +131,7 @@ func run(w *app.Window) error {
 
 type View struct {
 	viewModel       *ViewModel // Use ViewModel
-	th              *material.Theme
+	theme           *material.Theme
 	incrementButton widget.Clickable
 	decrementButton widget.Clickable
 }
@@ -142,30 +139,41 @@ type View struct {
 func NewView(vm *ViewModel, theme *material.Theme) *View { // Accept ViewModel
 	return &View{
 		viewModel:       vm,
-		th:              theme,
+		theme:           theme,
 		incrementButton: widget.Clickable{}, // Initialize buttons here
 		decrementButton: widget.Clickable{}, // Initialize buttons here
 	}
 }
 
 // Layout accepts theme
-func (v *View) Layout(gtx layout.Context) layout.Dimensions {
+func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	// Event handling in Layout
 	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{
 			Axis:      layout.Horizontal,
 			Alignment: layout.Middle,
 			Spacing:   layout.SpaceEvenly,
 		}.Layout(gtx,
-			layout.Rigid(material.Button(v.th, &v.incrementButton, "Increment").Layout),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				if v.incrementButton.Clicked(gtx) {
+					v.viewModel.Incre()
+				}
+				return material.Button(th, &v.incrementButton, "Increment").Layout(gtx)
+			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				paint.ColorOp{Color: color.NRGBA{R: 0, G: 0, B: 0, A: 255}}.Add(gtx.Ops)
-				m := material.Body1(v.th, v.viewModel.CountLabel()) // Use ViewModel's CountLabel
+				m := material.Body1(th, v.viewModel.CountLabel()) // Use ViewModel's CountLabel
 				m.Font.Weight = font.Bold
 				return m.Layout(gtx)
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
-			layout.Rigid(material.Button(v.th, &v.decrementButton, "Decrement").Layout),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				if v.incrementButton.Clicked(gtx) {
+					v.viewModel.Incre()
+				}
+				return material.Button(th, &v.decrementButton, "Decrement").Layout(gtx)
+			}),
 		)
 	})
 }
