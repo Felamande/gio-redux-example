@@ -3,7 +3,6 @@ package main
 import (
 	"image/color"
 	"log"
-	"strconv"
 
 	"gioui.org/app"
 	"gioui.org/font"
@@ -61,10 +60,6 @@ func NewStore(reducer func(State, Action) State, initialState State) *Store {
 	}
 }
 
-func (s *Store) Subscribe(listener func(State)) {
-	s.listeners = append(s.listeners, listener)
-}
-
 func (s *Store) Dispatch(action Action) {
 	s.state = s.reducer(s.state, action)
 	for _, listener := range s.listeners {
@@ -74,6 +69,32 @@ func (s *Store) Dispatch(action Action) {
 
 func (s *Store) GetState() State {
 	return s.state
+}
+
+// ViewModel
+type ViewModel struct {
+	s          *Store
+	countLabel string
+}
+
+func NewViewModel(store *Store) *ViewModel {
+	vm := &ViewModel{
+		s: store,
+	}
+
+	return vm
+}
+
+func (v *ViewModel) Increment() {
+	v.s.Dispatch(IncrementAction{})
+}
+
+func (v *ViewModel) Decrement() {
+	v.s.Dispatch(DecrementAction{})
+}
+
+func (vm *ViewModel) CountLabel() string {
+	return vm.countLabel
 }
 
 func main() {
@@ -87,59 +108,64 @@ func main() {
 }
 
 func run(w *app.Window) error {
-	// gofont.Register() // gofont.Register is automatically called by material.NewTheme
+	// gofont.Register()
 	th := material.NewTheme()
-
-	// Redux Store
 	store := NewStore(reduce, State{Count: 0})
+	viewModel := NewViewModel(store) // Create ViewModel
 
 	// UI elements
-	incrementButton := widget.Clickable{} // Corrected widget.Button
-	decrementButton := widget.Clickable{} // Corrected widget.Button
-	countLabel := ""
-
-	// Subscribe to store changes
-	store.Subscribe(func(state State) {
-		countLabel = "Count: " + strconv.Itoa(state.Count)
-		w.Invalidate() // Corrected w.Invalidate()
-	})
 
 	var ops op.Ops
+	view := NewView(viewModel, th) // Pass ViewModel to View
+
 	for {
 		switch e := w.Event().(type) {
-		case app.DestroyEvent: // Corrected event.DestroyEvent
+		case app.DestroyEvent:
 			return e.Err
-		case app.FrameEvent: // Corrected event.FrameEvent
-			gtx := app.NewContext(&ops, e) // Corrected layout.NewContext
+		case app.FrameEvent:
+			gtx := app.NewContext(&ops, e)
 
-			// Event handling
-			if incrementButton.Clicked(gtx) {
-				store.Dispatch(IncrementAction{})
-			}
-			if decrementButton.Clicked(gtx) {
-				store.Dispatch(DecrementAction{})
-			}
-
-			layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{
-					Axis:      layout.Horizontal, // Corrected layout.Row
-					Alignment: layout.Middle,
-					Spacing:   layout.SpaceEvenly,
-				}.Layout(gtx,
-					layout.Rigid(material.Button(th, &incrementButton, "Increment").Layout),
-					layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout), // Use unit.Dp for spacing
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						paint.ColorOp{Color: color.NRGBA{R: 0, G: 0, B: 0, A: 255}}.Add(gtx.Ops) // Corrected color.Black to color.NRGBA
-						m := material.Body1(th, countLabel)
-						m.Font.Weight = font.Bold
-						return m.Layout(gtx)
-					}),
-					layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout), // Use unit.Dp for spacing
-					layout.Rigid(material.Button(th, &decrementButton, "Decrement").Layout),
-				)
-			})
+			view.Layout(gtx) // Pass theme to Layout
 
 			e.Frame(gtx.Ops)
 		}
 	}
+}
+
+type View struct {
+	viewModel       *ViewModel // Use ViewModel
+	th              *material.Theme
+	incrementButton widget.Clickable
+	decrementButton widget.Clickable
+}
+
+func NewView(vm *ViewModel, theme *material.Theme) *View { // Accept ViewModel
+	return &View{
+		viewModel:       vm,
+		th:              theme,
+		incrementButton: widget.Clickable{}, // Initialize buttons here
+		decrementButton: widget.Clickable{}, // Initialize buttons here
+	}
+}
+
+// Layout accepts theme
+func (v *View) Layout(gtx layout.Context) layout.Dimensions {
+	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{
+			Axis:      layout.Horizontal,
+			Alignment: layout.Middle,
+			Spacing:   layout.SpaceEvenly,
+		}.Layout(gtx,
+			layout.Rigid(material.Button(v.th, &v.incrementButton, "Increment").Layout),
+			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				paint.ColorOp{Color: color.NRGBA{R: 0, G: 0, B: 0, A: 255}}.Add(gtx.Ops)
+				m := material.Body1(v.th, v.viewModel.CountLabel()) // Use ViewModel's CountLabel
+				m.Font.Weight = font.Bold
+				return m.Layout(gtx)
+			}),
+			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
+			layout.Rigid(material.Button(v.th, &v.decrementButton, "Decrement").Layout),
+		)
+	})
 }
