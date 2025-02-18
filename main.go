@@ -46,21 +46,53 @@ func reduce(state State, action Action) State {
 	return action.Apply(state)
 }
 
-// Store
-type Store struct {
-	state   State
-	reducer func(state State, action Action) State
-}
+// Middleware type
+type Middleware func(Dispatch) Dispatch
+type Dispatch func(action Action)
 
-func NewStore(reducer func(State, Action) State, initialState State) *Store {
-	return &Store{
-		state:   initialState,
-		reducer: reducer,
+// Logging Middleware
+func LoggingMiddleware(next Dispatch) Dispatch {
+	return func(action Action) {
+		log.Printf("Action dispatched: %T", action)
+		next(action)
+		// log.Printf("New state: %+v", store.GetState()) // cannot access store here
 	}
 }
 
+// Store
+type Store struct {
+	state      State
+	reducer    func(state State, action Action) State
+	middleware []Middleware
+	dispatch   Dispatch
+}
+
+func NewStore(reducer func(State, Action) State, initialState State, middleware ...Middleware) *Store {
+	store := &Store{
+		state:      initialState,
+		reducer:    reducer,
+		middleware: middleware,
+	}
+
+	store.dispatch = store.applyMiddleware(store.dispatchInternal())
+	return store
+}
+
+func (s *Store) dispatchInternal() Dispatch {
+	return func(action Action) {
+		s.state = s.reducer(s.state, action)
+	}
+}
+
+func (s *Store) applyMiddleware(dispatch Dispatch) Dispatch {
+	for _, middleware := range s.middleware {
+		dispatch = middleware(dispatch)
+	}
+	return dispatch
+}
+
 func (s *Store) Dispatch(action Action) {
-	s.state = s.reducer(s.state, action)
+	s.dispatch(action)
 }
 
 func (s *Store) GetState() State {
@@ -69,14 +101,13 @@ func (s *Store) GetState() State {
 
 // ViewModel
 type ViewModel struct {
-	store *Store // Add store to ViewModel
+	store *Store
 }
 
 func NewViewModel(store *Store) *ViewModel {
 	vm := &ViewModel{
-		store: store, // Store the store
+		store: store,
 	}
-
 	return vm
 }
 
@@ -106,11 +137,13 @@ func main() {
 func run(w *app.Window) error {
 	// gofont.Register()
 	th := material.NewTheme()
-	store := NewStore(reduce, State{Count: 0})
-	viewModel := NewViewModel(store) // Create ViewModel
+	store := NewStore(reduce, State{Count: 0}, LoggingMiddleware)
+	viewModel := NewViewModel(store)
 
 	var ops op.Ops
-	view := NewView(viewModel, th) // Pass ViewModel to View
+	view := NewView(viewModel, th)
+
+	// log.Printf("Initial state: %+v", store.GetState())
 
 	for {
 		switch e := w.Event().(type) {
@@ -119,25 +152,25 @@ func run(w *app.Window) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
-			view.Layout(gtx, th) // Pass theme to Layout
+			view.Layout(gtx, th)
 			e.Frame(gtx.Ops)
 		}
 	}
 }
 
 type View struct {
-	viewModel       *ViewModel // Use ViewModel
+	viewModel       *ViewModel
 	theme           *material.Theme
 	incrementButton widget.Clickable
 	decrementButton widget.Clickable
 }
 
-func NewView(vm *ViewModel, theme *material.Theme) *View { // Accept ViewModel
+func NewView(vm *ViewModel, theme *material.Theme) *View {
 	return &View{
 		viewModel:       vm,
 		theme:           theme,
-		incrementButton: widget.Clickable{}, // Initialize buttons here
-		decrementButton: widget.Clickable{}, // Initialize buttons here
+		incrementButton: widget.Clickable{},
+		decrementButton: widget.Clickable{},
 	}
 }
 
@@ -159,7 +192,7 @@ func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions 
 			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				paint.ColorOp{Color: color.NRGBA{R: 0, G: 0, B: 0, A: 255}}.Add(gtx.Ops)
-				m := material.Body1(th, v.viewModel.CountLabel()) // Use ViewModel's CountLabel
+				m := material.Body1(th, v.viewModel.CountLabel())
 				m.Font.Weight = font.Bold
 				return m.Layout(gtx)
 			}),
