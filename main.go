@@ -47,15 +47,17 @@ func reduce(state State, action Action) State {
 }
 
 // Middleware type
-type Middleware func(Dispatch) Dispatch
+type Middleware func(store *Store, next Dispatch) Dispatch
 type Dispatch func(action Action)
 
 // Logging Middleware
-func LoggingMiddleware(next Dispatch) Dispatch {
+func LoggingMiddleware(store *Store, next Dispatch) Dispatch {
 	return func(action Action) {
-		log.Printf("Action dispatched: %T", action)
+		prevState := store.GetState()
+		log.Printf("Action dispatched: %T, Previous State: %+v", action, prevState)
 		next(action)
-		// log.Printf("New state: %+v", store.GetState()) // cannot access store here
+		newState := store.GetState()
+		log.Printf("Action dispatched: %T, New State: %+v", action, newState)
 	}
 }
 
@@ -86,7 +88,7 @@ func (s *Store) dispatchInternal() Dispatch {
 
 func (s *Store) applyMiddleware(dispatch Dispatch) Dispatch {
 	for _, middleware := range s.middleware {
-		dispatch = middleware(dispatch)
+		dispatch = middleware(s, dispatch)
 	}
 	return dispatch
 }
