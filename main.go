@@ -48,24 +48,19 @@ func reduce(state State, action Action) State {
 
 // Store
 type Store struct {
-	state     State
-	reducer   func(state State, action Action) State
-	listeners []func(State)
+	state   State
+	reducer func(state State, action Action) State
 }
 
 func NewStore(reducer func(State, Action) State, initialState State) *Store {
 	return &Store{
-		state:     initialState,
-		reducer:   reducer,
-		listeners: []func(State){},
+		state:   initialState,
+		reducer: reducer,
 	}
 }
 
 func (s *Store) Dispatch(action Action) {
 	s.state = s.reducer(s.state, action)
-	for _, listener := range s.listeners {
-		listener(s.state)
-	}
 }
 
 func (s *Store) GetState() State {
@@ -100,6 +95,7 @@ func (v *ViewModel) CountLabel() string {
 func main() {
 	go func() {
 		w := &app.Window{}
+		w.Option(app.Title("Counter App"))
 		if err := run(w); err != nil {
 			log.Fatal(err)
 		}
@@ -169,8 +165,8 @@ func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions 
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				if v.incrementButton.Clicked(gtx) {
-					v.viewModel.Incre()
+				if v.decrementButton.Clicked(gtx) {
+					v.viewModel.Decre()
 				}
 				return material.Button(th, &v.decrementButton, "Decrement").Layout(gtx)
 			}),
