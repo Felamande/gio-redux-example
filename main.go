@@ -154,7 +154,7 @@ func run(w *app.Window) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
-			view.Layout(gtx, th)
+			view.Layout(gtx)
 			e.Frame(gtx.Ops)
 		}
 	}
@@ -177,7 +177,7 @@ func NewView(vm *ViewModel, theme *material.Theme) *View {
 }
 
 // Layout accepts theme
-func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions {
+func (v *View) Layout(gtx layout.Context) layout.Dimensions {
 	// Event handling in Layout
 	return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{
@@ -189,12 +189,12 @@ func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions 
 				if v.incrementButton.Clicked(gtx) {
 					v.viewModel.Incre()
 				}
-				return material.Button(th, &v.incrementButton, "Increment").Layout(gtx)
+				return material.Button(v.theme, &v.incrementButton, "Increment").Layout(gtx)
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(20)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				paint.ColorOp{Color: color.NRGBA{R: 0, G: 0, B: 0, A: 255}}.Add(gtx.Ops)
-				m := material.Body1(th, v.viewModel.CountLabel())
+				m := material.Body1(v.theme, v.viewModel.CountLabel())
 				m.Font.Weight = font.Bold
 				return m.Layout(gtx)
 			}),
@@ -203,7 +203,7 @@ func (v *View) Layout(gtx layout.Context, th *material.Theme) layout.Dimensions 
 				if v.decrementButton.Clicked(gtx) {
 					v.viewModel.Decre()
 				}
-				return material.Button(th, &v.decrementButton, "Decrement").Layout(gtx)
+				return material.Button(v.theme, &v.decrementButton, "Decrement").Layout(gtx)
 			}),
 		)
 	})
